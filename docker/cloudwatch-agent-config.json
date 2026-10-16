@@ -1,0 +1,56 @@
+{
+  "agent": {
+    "metrics_collection_interval": 60,
+    "run_as_user": "root"
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/retail-inventory-api/app.log",
+            "log_group_name": "/aws/ec2/retail-inventory-api",
+            "log_stream_name": "{instance_id}",
+            "timezone": "UTC",
+            "timestamp_format": "%Y-%m-%dT%H:%M:%S.%fZ",
+            "multi_line_start_pattern": "^{\"timestamp\""
+          }
+        ]
+      }
+    }
+  },
+  "metrics": {
+    "namespace": "RetailInventory/EC2",
+    "metrics_collected": {
+      "cpu": {
+        "measurement": [
+          "cpu_usage_idle",
+          "cpu_usage_iowait",
+          "cpu_usage_user",
+          "cpu_usage_system"
+        ],
+        "metrics_collection_interval": 60,
+        "totalcpu": true
+      },
+      "mem": {
+        "measurement": [
+          "mem_used_percent"
+        ],
+        "metrics_collection_interval": 60
+      },
+      "disk": {
+        "measurement": [
+          "disk_used_percent"
+        ],
+        "metrics_collection_interval": 60,
+        "resources": [
+          "/"
+        ]
+      }
+    },
+    "append_dimensions": {
+      "InstanceId": "${aws:InstanceId}",
+      "AutoScalingGroupName": "${aws:AutoScalingGroupName}"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+# Git & GitHub
+.git
+.gitignore
+.github
+
+# Virtual Environments
+.venv
+venv
+ENV
+env
+
+# Python Cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Tests & Coverage
+tests
+.pytest_cache
+.coverage
+htmlcov
+
+# Local Database & Logs
+*.db
+*.sqlite
+*.sqlite3
+data
+logs
+*.log
+
+# Documentation & Miscellaneous
+README.md
+.env
+.env.example
+.vscode
+.idea
+*.swp

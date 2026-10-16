@@ -1,0 +1,77 @@
+name: Continuous Deployment
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Run Test Suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run pytest
+        run: |
+          pytest -v
+
+  deploy:
+    name: Deploy to AWS EC2
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+      - name: Add EC2 Host to Known Hosts
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -H -p ${{ secrets.EC2_PORT || 22 }} ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Transfer Project Files to EC2
+        run: |
+          rsync -avz --delete \
+            --exclude '.git' \
+            --exclude '.venv' \
+            --exclude '__pycache__' \
+            --exclude '*.db' \
+            --exclude 'logs' \
+            -e "ssh -p ${{ secrets.EC2_PORT || 22 }}" \
+            ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/opt/retail-inventory/
+
+      - name: Execute Deployment Script on EC2
+        run: |
+          ssh -p ${{ secrets.EC2_PORT || 22 }} ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            set -e
+            cd /opt/retail-inventory
+            chmod +x scripts/deploy.sh scripts/health_check.sh
+            ./scripts/deploy.sh
+          EOF
+
+      - name: Post-Deployment External Health Check
+        run: |
+          chmod +x scripts/health_check.sh
+          ./scripts/health_check.sh "http://${{ secrets.EC2_HOST }}:5000/health"

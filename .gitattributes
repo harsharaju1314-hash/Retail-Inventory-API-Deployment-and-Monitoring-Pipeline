@@ -1,0 +1,7 @@
+# Set default behavior to automatically handle line endings
+* text=auto
+
+# Explicitly ensure shell scripts and container files preserve Unix LF endings
+*.sh text eol=lf
+Dockerfile text eol=lf
+.dockerignore text eol=lf
