@@ -39,12 +39,39 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Validate Deployment Secrets
+        id: check_secrets
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          if [ -z "$EC2_HOST" ] || [ -z "$EC2_SSH_KEY" ] || [ -z "$EC2_USER" ]; then
+            echo "configured=false" >> $GITHUB_OUTPUT
+            echo "::warning title=Missing Deployment Credentials::AWS EC2 deployment secrets (EC2_HOST, EC2_USER, EC2_SSH_KEY) are not configured in GitHub Secrets. Automated testing passed successfully, but remote EC2 deployment was skipped."
+            echo "===================================================================================="
+            echo "NOTICE: EC2 Deployment credentials are not yet configured in GitHub Actions Secrets."
+            echo "The test suite has passed successfully."
+            echo "To enable deployment to your AWS EC2 instance, add the following secrets:"
+            echo "  1. EC2_HOST    - Public IPv4 or DNS of your EC2 instance"
+            echo "  2. EC2_USER    - SSH username (e.g., ubuntu)"
+            echo "  3. EC2_SSH_KEY - Full private SSH key (.pem file content)"
+            echo "  4. EC2_PORT    - (Optional) SSH port, defaults to 22"
+            echo "Navigate to: Repository Settings -> Secrets and variables -> Actions -> New repository secret"
+            echo "===================================================================================="
+          else
+            echo "configured=true" >> $GITHUB_OUTPUT
+            echo "All required deployment secrets are present. Proceeding with EC2 deployment."
+          fi
+
       - name: Configure SSH Agent
+        if: steps.check_secrets.outputs.configured == 'true'
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
       - name: Add EC2 Host to Known Hosts
+        if: steps.check_secrets.outputs.configured == 'true'
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
@@ -52,6 +79,7 @@ jobs:
           chmod 644 ~/.ssh/known_hosts
 
       - name: Transfer Project Files to EC2
+        if: steps.check_secrets.outputs.configured == 'true'
         run: |
           rsync -avz --delete \
             --exclude '.git' \
@@ -63,6 +91,7 @@ jobs:
             ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/opt/retail-inventory/
 
       - name: Execute Deployment Script on EC2
+        if: steps.check_secrets.outputs.configured == 'true'
         run: |
           ssh -p ${{ secrets.EC2_PORT || 22 }} ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
             set -e
@@ -72,6 +101,7 @@ jobs:
           EOF
 
       - name: Post-Deployment External Health Check
+        if: steps.check_secrets.outputs.configured == 'true'
         run: |
           chmod +x scripts/health_check.sh
           ./scripts/health_check.sh "http://${{ secrets.EC2_HOST }}:5000/health"
